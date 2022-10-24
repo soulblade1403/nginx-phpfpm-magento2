@@ -1,0 +1,13 @@
+[mysqld]
+innodb_file_per_table = 1
+max_connections = 500
+slow_query_log
+query_cache_limit = 4M
+query_cache_size = 128M
+query_cache_type = 1
+innodb_buffer_pool_size = 256M
+innodb_thread_concurrency = 10
+table_open_cache = 256
+max_allowed_packet = 1024M
+tmp_table_size = 512M
+max_heap_table_size = 512M

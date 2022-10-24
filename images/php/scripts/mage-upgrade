@@ -1,0 +1,54 @@
+#!/bin/bash
+set -e
+
+echo "Initializing update..."
+cd /var/www/html
+
+if [ ! -f ./app/etc/env.php ]; then
+  echo "It appears Magento is not install (app/etc/config.php or app/etc/env.php exist). Please setup now..."
+  exit
+fi
+
+chmod +x ./bin/magento
+
+echo "Create robots.txt"
+cat <<EOF >> robots.txt
+User-agent: *
+Disallow: /
+EOF
+
+# echo "Clear cache"
+# rm -rf var/cache var/page_cache var/generation var/di var/view_preprocessed
+
+echo "Enable modules"
+php -d memory_limit=2G /usr/local/bin/composer install
+
+echo -n "Waiting connect db"
+while [ -e database_not_ready ]; do
+    mysql --host=$M2SETUP_DB_HOST --user=$M2SETUP_DB_USER --password=$M2SETUP_DB_PASSWORD \
+          --execute="show tables" $M2SETUP_DB_NAME >/dev/null 2>&1 && rm database_not_ready
+    sleep 2s
+    echo -n "."
+done
+echo
+
+echo "Run setup scripts"
+php bin/magento setup:di:compile
+php bin/magento setup:db:status && UPGRADE_NEEDED=0 || UPGRADE_NEEDED=1 || UPGRADE_NEEDED=2
+if [[ 0 != ${UPGRADE_NEEDED} ]]; then
+  php bin/magento setup:upgrade
+fi
+php bin/magento cache:clean
+
+echo "Config ES & Reindex Catalog Search"
+php bin/magento indexer:reindex catalogsearch_fulltext
+
+echo "The setup script has completed execution."
+echo "
+===================== 🚀 Done 🚀 ===================
+      Magento 2 Installed successfully!
+      🌎 Admin: "$M2SETUP_BASE_URL"admin
+      👤 User: "$M2SETUP_ADMIN_USER"
+      🔑 Password: "$M2SETUP_ADMIN_PASSWORD"
+===================== 🚀 Done 🚀 ==================="
+
